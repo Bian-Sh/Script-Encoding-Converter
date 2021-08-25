@@ -77,7 +77,7 @@ public class ScriptEncodingConverter : MonoBehaviour
         {
             using (BinaryReader br = new BinaryReader(file))
             {
-                var prefixs = br.ReadBytes(2);
+                var prefixs = br.ReadBytes(2); //仅仅读取2位，就是这么抠门
                 return prefixs;
             }
         }
