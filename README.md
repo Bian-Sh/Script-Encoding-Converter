@@ -4,9 +4,9 @@
  这是一个将脚本编码从 GB2312 转换为 UTF8 的编辑器扩展
  
  # Feature / 功能
- 1. 支持 Project 窗口单/多选文件进行编码转换
+ 1. 支持 Project 窗口单/多选文件、文件夹选中进行编码转换
 
-    Muilt-files selected for onekey encoding convert 
+    Muilt-files or folder can selected for onekey encoding convert 
   
  3. 支持设置为自动编码转换
  
