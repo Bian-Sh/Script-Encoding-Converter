@@ -1,7 +1,12 @@
-# Script Encoding Converter - Dot Use it （请勿投入生产代码中）
- Editor extension for covert script encoding from gb2312 to utf8
+# Script Encoding Converter
+
+> Important: Don't Use it before backup your scripts (usally backup by git)
+
+> 重要提示：请在使用前使用 git 提交你的代码
+
+ Editor extension for covert script encoding from gb2312 to utf8，it's useful.
  
- 这是一个将脚本编码从 GB2312 转换为 UTF8 的编辑器扩展 
+ 这是一个将脚本编码从 GB2312 转换为 UTF8 的编辑器扩展，从某种角度来看，还挺好用！ 
  
  # Feature / 功能 
  1. 支持 Project 窗口单/多选文件、文件夹选中进行编码转换
