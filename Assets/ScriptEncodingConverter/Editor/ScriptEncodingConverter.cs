@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -19,12 +19,35 @@ public class ScriptEncodingConverter : MonoBehaviour
     {
         var settings = new ConvertSettings
         {
-            predicate = x => x[0] != 0xEF || x[1] != 0xBB,
+            predicate = x =>!DetectFileEncoding(x),
             from = Encoding.GetEncoding(936),
             to = Encoding.UTF8,
         };
         EncodingConverter(settings);
     }
+
+    public static bool DetectFileEncoding(string file)
+    {
+        var Utf8EncodingVerifier = Encoding.GetEncoding("utf-8", new EncoderExceptionFallback(), new DecoderExceptionFallback());
+        using (var reader = new StreamReader(file, Utf8EncodingVerifier,true, 1024))
+        {
+            string detectedEncoding;
+            try
+            {
+                while (!reader.EndOfStream)
+                {
+                    var line = reader.ReadLine();
+                }
+                detectedEncoding = reader.CurrentEncoding.BodyName;
+            }
+            catch (Exception e)
+            {
+                detectedEncoding = "ISO-8859-1";
+            }
+            return detectedEncoding=="utf-8";
+        }
+    }
+
 
     /// <summary> 是否开启Encoding自动修正</summary>
     [MenuItem(menu_auto, priority = 100)]
@@ -41,7 +64,7 @@ public class ScriptEncodingConverter : MonoBehaviour
     {
         var settings = new ConvertSettings
         {
-            predicate = x => x[0] == 0xEF && x[1] == 0xBB,
+            predicate = x =>DetectFileEncoding(x),
             from = Encoding.UTF8,
             to = Encoding.GetEncoding(936),
         };
@@ -57,8 +80,7 @@ public class ScriptEncodingConverter : MonoBehaviour
             foreach (var item in msarr)
             {
                 string path = AssetDatabase.GetAssetPath(item);
-                byte[] prefixs = GetPrefixByteArray(path);
-                if (settings.predicate.Invoke(prefixs))
+                if (settings.predicate.Invoke(path))
                 {
                     var text = File.ReadAllText(path, settings.from);
                     File.WriteAllText(path, text, settings.to);
@@ -71,22 +93,10 @@ public class ScriptEncodingConverter : MonoBehaviour
         }
     }
 
-    static byte[] GetPrefixByteArray(string path)
-    {
-        using (FileStream file = File.OpenRead(path))
-        {
-            using (BinaryReader br = new BinaryReader(file))
-            {
-                var prefixs = br.ReadBytes(2); //仅仅读取2位，就是这么抠门
-                return prefixs;
-            }
-        }
-    }
-
     class ConvertSettings
     {
-        /// <summary>简单的断言是否为 UTF8 编码</summary>
-        public Func<byte[], bool> predicate;
+        /// <summary>断言是否为 UTF8 编码</summary>
+        public Func<string, bool> predicate;
         public Encoding from, to;
     }
 
@@ -103,8 +113,8 @@ public class ScriptEncodingConverter : MonoBehaviour
             List<string> files = new List<string>();
             foreach (var path in scripts)
             {
-                byte[] prefixs = GetPrefixByteArray(path);
-                if (prefixs[0] != 0xEF || prefixs[1] != 0xBB) //没有发现 UTF8 标签
+                
+                if (!DetectFileEncoding(path)) //如果不是 UTF8 编码
                 {
                     var text = File.ReadAllText(path, Encoding.GetEncoding(936));
                     File.WriteAllText(path, text, Encoding.UTF8);
