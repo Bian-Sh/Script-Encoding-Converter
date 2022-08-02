@@ -13,13 +13,14 @@ public class ScriptEncodingConverter : MonoBehaviour
     const string menu_to_utf8 = "Assets/Script Encoding Converter/To UTF8";
     const string menu_to_gb2312 = "Assets/Script Encoding Converter/To GB2312";
     const string menu_auto = "Assets/Script Encoding Converter/Auto Fix";
+    static bool isConvertManually = false;
     /// <summary> 将脚本编码格式转换为 UTF8 </summary>
     [MenuItem(menu_to_utf8)]
     static void Convert2UTF8()
     {
         var settings = new ConvertSettings
         {
-            predicate = x =>!DetectFileEncoding(x),
+            predicate = x => !DetectFileEncoding(x),
             from = Encoding.GetEncoding(936),
             to = Encoding.UTF8,
         };
@@ -29,22 +30,20 @@ public class ScriptEncodingConverter : MonoBehaviour
     public static bool DetectFileEncoding(string file)
     {
         var Utf8EncodingVerifier = Encoding.GetEncoding("utf-8", new EncoderExceptionFallback(), new DecoderExceptionFallback());
-        using (var reader = new StreamReader(file, Utf8EncodingVerifier,true, 1024))
+        using (var reader = new StreamReader(file, Utf8EncodingVerifier, true, 1024))
         {
-            string detectedEncoding;
             try
             {
                 while (!reader.EndOfStream)
                 {
                     var line = reader.ReadLine();
                 }
-                detectedEncoding = reader.CurrentEncoding.BodyName;
+                return "utf-8" == reader.CurrentEncoding.BodyName;
             }
-            catch (Exception e)
+            catch (Exception)
             {
-                detectedEncoding = "ISO-8859-1";
+                return false;
             }
-            return detectedEncoding=="utf-8";
         }
     }
 
@@ -64,7 +63,7 @@ public class ScriptEncodingConverter : MonoBehaviour
     {
         var settings = new ConvertSettings
         {
-            predicate = x =>DetectFileEncoding(x),
+            predicate = x => DetectFileEncoding(x),
             from = Encoding.UTF8,
             to = Encoding.GetEncoding(936),
         };
@@ -76,6 +75,7 @@ public class ScriptEncodingConverter : MonoBehaviour
         MonoScript[] msarr = Selection.GetFiltered<MonoScript>(SelectionMode.DeepAssets);
         if (null != msarr && msarr.Length > 0)
         {
+            isConvertManually = true;
             List<string> files = new List<string>();
             foreach (var item in msarr)
             {
@@ -85,11 +85,12 @@ public class ScriptEncodingConverter : MonoBehaviour
                     var text = File.ReadAllText(path, settings.from);
                     File.WriteAllText(path, text, settings.to);
                     files.Add(path);
+                    AssetDatabase.ImportAsset(path);
                 }
             }
             var info = files.Count > 0 ? $"处理文件 {files.Count} 个，更多 ↓ \n{string.Join("\n", files)}" : "没有发现编码问题！";
             Debug.Log($"{nameof(ScriptEncodingConverter)}: 转换 {settings.to} 完成，{info}");
-            AssetDatabase.Refresh();
+            isConvertManually = false;
         }
     }
 
@@ -105,15 +106,14 @@ public class ScriptEncodingConverter : MonoBehaviour
         //所有的资源的导入，删除，移动，都会调用此方法，注意，这个方法是static的
         public static void OnPostprocessAllAssets(string[] importedAsset, string[] deletedAssets, string[] movedAssets, string[] movedFromAssetPaths)
         {
-            //如果用户不选择自动修正则不处理
-            if (!EditorPrefs.GetBool(key, false)) return;
+            //如果用户手动处理中，或者没选择自动修正则不处理，不响应此回调
+            if (isConvertManually || !EditorPrefs.GetBool(key, false)) return;
             //仅对有修改的脚本进行处理
             var scripts = importedAsset.Where(v => v.EndsWith(".cs"));
             if (scripts.Count() == 0) return;
             List<string> files = new List<string>();
             foreach (var path in scripts)
             {
-                
                 if (!DetectFileEncoding(path)) //如果不是 UTF8 编码
                 {
                     var text = File.ReadAllText(path, Encoding.GetEncoding(936));
@@ -125,7 +125,10 @@ public class ScriptEncodingConverter : MonoBehaviour
             {
                 var info = $"处理文件 {files.Count} 个，更多 ↓ \n{string.Join("\n", files)}";
                 Debug.Log($"Auto fix to UTF8 , {info}");
-                AssetDatabase.Refresh();
+                foreach (var file in files)
+                {
+                    AssetDatabase.ImportAsset(file);
+                }
             }
         }
     }
