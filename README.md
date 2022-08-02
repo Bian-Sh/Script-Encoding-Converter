@@ -17,9 +17,9 @@
  
     Can auto fix encoding issue if you prefer to.
  
- 5. 简易的 UTF8-Bom 断言
+ 5. 有效的 UTF8 断言
  
-    Just a simple way to check wether a script is under utf8-bom or not.
+    A simple but effective way to check wether a script is Encoding.utf8 or not.
  
  # GIF / 动画
  ![](doc/converter.gif)
@@ -33,9 +33,10 @@
     Demonstrates that the script is automatically changed to UTF8 after being modified
  
 # Summary / 结语
- 这个组件对脚本中有汉字的人会有帮助，它解决了某些情况下脚本编码会变成 GB2312 导致 Unity 识别异常，异常表现为要么 Inspector 上可见乱码，要么 log 信息中出现乱码。
+ 这个组件对脚本中有汉字的人会有帮助，它解决了某些情况下脚本编码会变成 GB2312 导致 Unity 识别异常的问题，异常表现为要么 Inspector 上可见乱码，要么 log 信息中出现乱码。
  
  This plugin would be helpful when script contians some Chinese characters. It solves the problem that in some cases the script will become a GB2312 Encoding and cause Unity  recognize abnormality. The details of the abnormality can be seen on the Inspector,as well as in the log context.
 
-> 不同于json ，脚本恰恰需要 Bom 做编码格式标识，不会对开发产生任何的负面影响。脚本使用 UTF8 无 Bom 的不要使用本工具。
-
+> 脚本使用的 UTF8 编码不管有没有 Bom 均可使用本工具。
+>
+> utf-8 dom and utf-8 can use this tool.
