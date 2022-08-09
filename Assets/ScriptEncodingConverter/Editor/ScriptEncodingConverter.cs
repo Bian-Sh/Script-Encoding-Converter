@@ -6,8 +6,7 @@ using System.Text;
 using UnityEditor;
 using UnityEngine;
 //BOM(Byte Order Mark)
-
-public class ScriptEncodingConverter : MonoBehaviour
+public class ScriptEncodingConverter 
 {
     const string key = "SEC_AutoFix";
     const string menu_to_utf8 = "Assets/Script Encoding Converter/To UTF8";
@@ -20,17 +19,17 @@ public class ScriptEncodingConverter : MonoBehaviour
     {
         var settings = new ConvertSettings
         {
-            predicate = x => !DetectFileEncoding(x),
+            predicate = x => DetectFileEncoding(x, "gb2312"),
             from = Encoding.GetEncoding(936),
             to = Encoding.UTF8,
         };
         EncodingConverter(settings);
     }
 
-    public static bool DetectFileEncoding(string file)
+    public static bool DetectFileEncoding(string file,string name)
     {
-        var Utf8EncodingVerifier = Encoding.GetEncoding("utf-8", new EncoderExceptionFallback(), new DecoderExceptionFallback());
-        using (var reader = new StreamReader(file, Utf8EncodingVerifier, true, 1024))
+        var encodingVerifier = Encoding.GetEncoding(name, new EncoderExceptionFallback(), new DecoderExceptionFallback());
+        using (var reader = new StreamReader(file, encodingVerifier, true, 1024))
         {
             try
             {
@@ -38,7 +37,7 @@ public class ScriptEncodingConverter : MonoBehaviour
                 {
                     var line = reader.ReadLine();
                 }
-                return "utf-8" == reader.CurrentEncoding.BodyName;
+                return reader.CurrentEncoding.BodyName==name;
             }
             catch (Exception)
             {
@@ -46,8 +45,6 @@ public class ScriptEncodingConverter : MonoBehaviour
             }
         }
     }
-
-
     /// <summary> 是否开启Encoding自动修正</summary>
     [MenuItem(menu_auto, priority = 100)]
     static void SwitchAutoFixState()
@@ -63,7 +60,7 @@ public class ScriptEncodingConverter : MonoBehaviour
     {
         var settings = new ConvertSettings
         {
-            predicate = x => DetectFileEncoding(x),
+            predicate = x => DetectFileEncoding(x, "utf-8"),
             from = Encoding.UTF8,
             to = Encoding.GetEncoding(936),
         };
@@ -96,7 +93,6 @@ public class ScriptEncodingConverter : MonoBehaviour
 
     class ConvertSettings
     {
-        /// <summary>断言是否为 UTF8 编码</summary>
         public Func<string, bool> predicate;
         public Encoding from, to;
     }
@@ -114,7 +110,7 @@ public class ScriptEncodingConverter : MonoBehaviour
             List<string> files = new List<string>();
             foreach (var path in scripts)
             {
-                if (!DetectFileEncoding(path)) //如果不是 UTF8 编码
+                if (DetectFileEncoding(path,"gb2312")) //如果是  gb2312 编码就改成 utf-8
                 {
                     var text = File.ReadAllText(path, Encoding.GetEncoding(936));
                     File.WriteAllText(path, text, Encoding.UTF8);
