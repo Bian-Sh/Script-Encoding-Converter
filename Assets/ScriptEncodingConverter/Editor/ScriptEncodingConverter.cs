@@ -6,7 +6,7 @@ using System.Text;
 using UnityEditor;
 using UnityEngine;
 //BOM(Byte Order Mark)
-public class ScriptEncodingConverter 
+public class ScriptEncodingConverter
 {
     const string key = "SEC_AutoFix";
     const string menu_to_utf8 = "Assets/Script Encoding Converter/To UTF8";
@@ -19,14 +19,17 @@ public class ScriptEncodingConverter
     {
         var settings = new ConvertSettings
         {
-            predicate = x => DetectFileEncoding(x, "gb2312"),
+            predicate = x => IsNeedConvertToUtf8(x),
             from = Encoding.GetEncoding(936),
-            to = Encoding.UTF8,
+            to = new UTF8Encoding(false),
         };
         EncodingConverter(settings);
     }
 
-    public static bool DetectFileEncoding(string file,string name)
+    // 因为 DetectFileEncoding 函数判断 gb2312 时，对 utf-8 no bom 返回了true，所以做双重判断
+    static bool IsNeedConvertToUtf8(string file) => !DetectFileEncoding(file, "utf-8") && DetectFileEncoding(file,"gb2312");
+
+    public static bool DetectFileEncoding(string file, string name)
     {
         var encodingVerifier = Encoding.GetEncoding(name, new EncoderExceptionFallback(), new DecoderExceptionFallback());
         using (var reader = new StreamReader(file, encodingVerifier, true, 1024))
@@ -37,7 +40,7 @@ public class ScriptEncodingConverter
                 {
                     var line = reader.ReadLine();
                 }
-                return reader.CurrentEncoding.BodyName==name;
+                return reader.CurrentEncoding.BodyName == name;
             }
             catch (Exception)
             {
@@ -104,16 +107,18 @@ public class ScriptEncodingConverter
         {
             //如果用户手动处理中，或者没选择自动修正则不处理，不响应此回调
             if (isConvertManually || !EditorPrefs.GetBool(key, false)) return;
-            //仅对有修改的脚本进行处理
-            var scripts = importedAsset.Where(v => v.EndsWith(".cs"));
-            if (scripts.Count() == 0) return;
+            //仅对有修改的脚本进行处理, 内置 Package 包是只读的，避免死循环故而不处理。
+            var scripts = importedAsset.Where(v => v.EndsWith(".cs"))
+                .Where(v => !Path.GetFullPath(v).Contains("PackageCache"))
+                .ToArray();
             List<string> files = new List<string>();
             foreach (var path in scripts)
             {
-                if (DetectFileEncoding(path,"gb2312")) //如果是  gb2312 编码就改成 utf-8
+                //如果是  gb2312 编码就改成 utf-8
+                if (IsNeedConvertToUtf8(path))
                 {
                     var text = File.ReadAllText(path, Encoding.GetEncoding(936));
-                    File.WriteAllText(path, text, Encoding.UTF8);
+                    File.WriteAllText(path, text, new UTF8Encoding(false));
                     files.Add(path);
                 }
             }
