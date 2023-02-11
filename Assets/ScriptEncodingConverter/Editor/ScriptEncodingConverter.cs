@@ -7,6 +7,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
 using UnityEditor;
 using UnityEngine;
@@ -18,6 +20,25 @@ public class ScriptEncodingConverter
     const string menu_to_gb2312 = "Assets/Script Encoding Converter/To GB2312";
     const string menu_auto = "Assets/Script Encoding Converter/Auto Fix";
     static bool isConvertManually = false;
+
+
+    /// <summary> 是否开启Encoding自动修正</summary>
+    [MenuItem(menu_auto, priority = 100)]
+    static void SwitchAutoFixState()
+    {
+        var value = !EditorPrefs.GetBool(key, false);
+        EditorPrefs.SetBool(key, value);
+        Menu.SetChecked(menu_auto, value);
+    }
+    /// <summary> 初始化 <see cref="menu_auto"/> 菜单的 checked 状态 </summary>
+    [MenuItem(menu_auto, validate = true)]
+    static bool SwitchAutoFixStateValidate()
+    {
+        var value = EditorPrefs.GetBool(key, false);
+        Menu.SetChecked(menu_auto, value);
+        return true;
+    }
+
     /// <summary> 将脚本编码格式转换为 UTF8 </summary>
     [MenuItem(menu_to_utf8)]
     static void Convert2UTF8()
@@ -31,8 +52,21 @@ public class ScriptEncodingConverter
         EncodingConverter(settings);
     }
 
+    /// <summary> 将脚本编码格式转换为 GB2312 (测试用) </summary>
+    [MenuItem(menu_to_gb2312)]
+    static void Convert2GB2312()
+    {
+        var settings = new ConvertSettings
+        {
+            predicate = x => DetectFileEncoding(x, "utf-8"),
+            from = Encoding.UTF8,
+            to = Encoding.GetEncoding(936),
+        };
+        EncodingConverter(settings);
+    }
+
     // 因为 DetectFileEncoding 函数判断 gb2312 时，对 utf-8 no bom 返回了true，所以做双重判断
-    static bool IsNeedConvertToUtf8(string file) => !DetectFileEncoding(file, "utf-8") && DetectFileEncoding(file,"gb2312");
+    static bool IsNeedConvertToUtf8(string file) => !DetectFileEncoding(file, "utf-8") && DetectFileEncoding(file, "gb2312");
 
     public static bool DetectFileEncoding(string file, string name)
     {
@@ -53,27 +87,6 @@ public class ScriptEncodingConverter
             }
         }
     }
-    /// <summary> 是否开启Encoding自动修正</summary>
-    [MenuItem(menu_auto, priority = 100)]
-    static void SwitchAutoFixState()
-    {
-        var value = !EditorPrefs.GetBool(key, false);
-        EditorPrefs.SetBool(key, value);
-        Menu.SetChecked(menu_auto, value);
-    }
-
-    /// <summary> 将脚本编码格式转换为 GB2312 (测试用) </summary>
-    [MenuItem(menu_to_gb2312)]
-    static void Convert2GB2312()
-    {
-        var settings = new ConvertSettings
-        {
-            predicate = x => DetectFileEncoding(x, "utf-8"),
-            from = Encoding.UTF8,
-            to = Encoding.GetEncoding(936),
-        };
-        EncodingConverter(settings);
-    }
 
     static void EncodingConverter(ConvertSettings settings)
     {
@@ -93,8 +106,7 @@ public class ScriptEncodingConverter
                     AssetDatabase.ImportAsset(path);
                 }
             }
-            var info = files.Count > 0 ? $"处理文件 {files.Count} 个，更多 ↓ \n{string.Join("\n", files)}" : "没有发现编码问题！";
-            Debug.Log($"{nameof(ScriptEncodingConverter)}: 转换 {settings.to} 完成，{info}");
+            Report("手动处理", files);
             isConvertManually = false;
         }
     }
@@ -129,8 +141,7 @@ public class ScriptEncodingConverter
             }
             if (files.Count > 0)
             {
-                var info = $"处理文件 {files.Count} 个，更多 ↓ \n{string.Join("\n", files)}";
-                Debug.Log($"Auto fix to UTF8 , {info}");
+                Report("Auto fix to UTF8", files);
                 foreach (var file in files)
                 {
                     AssetDatabase.ImportAsset(file);
@@ -138,4 +149,47 @@ public class ScriptEncodingConverter
             }
         }
     }
+
+    #region 为 Log 的文件条目提供超链接，点击可以  Ping/高亮 脚本文件
+    [InitializeOnLoadMethod]
+    private static void Init()
+    {
+#if UNITY_2021_1_OR_NEWER
+        EditorGUI.hyperLinkClicked += OnLinkClicked;
+        static void OnLinkClicked(EditorWindow ew, HyperLinkClickedEventArgs args)
+        {
+            if (args.hyperLinkData.TryGetValue("sourcefile", out var file))
+            {
+                EditorGUIUtility.PingObject(AssetDatabase.LoadAssetAtPath<TextAsset>(file));
+            }
+        };
+     }
+#else
+        var evt = typeof(EditorGUI).GetEvent("hyperLinkClicked", BindingFlags.Static | BindingFlags.NonPublic);
+        if (evt != null)
+        {
+            var handler = Delegate.CreateDelegate(evt.EventHandlerType, typeof(ScriptEncodingConverter), nameof(OnLinkClicked));
+            evt.AddMethod.Invoke(null, new object[] { handler });
+        }
+    }
+    static void OnLinkClicked(object sender, EventArgs args)
+    {
+        var property = args.GetType().GetProperty("hyperlinkInfos", BindingFlags.Instance | BindingFlags.Public);
+        if (property.GetValue(args) is Dictionary<string, string> infos)
+        {
+            if (infos.TryGetValue("sourcefile", out var file))
+            {
+                EditorGUIUtility.PingObject(AssetDatabase.LoadAssetAtPath<TextAsset>(file));
+            }
+        }
+    }
+#endif
+    static void Report(string title, IEnumerable<string> files)
+    {
+        // 加入 hyperlink
+        files = files.Select(v => $"<a sourcefile=\"{v}\">{v}</a>");
+        var info = files.Count() > 0 ? $"处理文件 {files.Count()} 个，更多 ↓ \n{string.Join("\n", files)}" : "没有发现编码问题！";
+        Debug.Log($"{title}: {info}");
+    }
+    #endregion
 }
